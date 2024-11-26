@@ -1,0 +1,75 @@
+import java.io.*;
+import java.util.*;
+
+public class CSVProcessor {
+    public static void main(String[] args) {
+        // File paths - replace with your actual file paths
+        String cpuFile = "file1.csv";
+        String heapFile = "file2.csv";
+        String gcFile = "file3.csv";
+        String outputFile = "output.csv";
+
+        // Maps to store data from each file
+        Map<String, String> cpuData = new HashMap<>();
+        Map<String, String> heapData = new HashMap<>();
+        Map<String, String> gcData = new HashMap<>();
+        Set<String> allApplications = new HashSet<>();
+
+        // Read all files
+        try {
+            readCSVFile(cpuFile, cpuData, allApplications);
+            readCSVFile(heapFile, heapData, allApplications);
+            readCSVFile(gcFile, gcData, allApplications);
+
+            // Write combined data to output file
+            writeOutputFile(outputFile, allApplications, cpuData, heapData, gcData);
+            
+            System.out.println("Processing completed successfully. Check " + outputFile);
+            
+        } catch (IOException e) {
+            System.err.println("Error processing files: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private static void readCSVFile(String filePath, Map<String, String> dataMap, Set<String> applications) 
+            throws IOException {
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            // Skip header if exists
+            br.readLine();
+            
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
+                if (values.length >= 3) {
+                    String appName = values[0].trim();
+                    String value = values[2].trim();
+                    dataMap.put(appName, value);
+                    applications.add(appName);
+                }
+            }
+        }
+    }
+
+    private static void writeOutputFile(String outputFile, Set<String> applications,
+            Map<String, String> cpuData, Map<String, String> heapData, Map<String, String> gcData) 
+            throws IOException {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile))) {
+            // Write header
+            bw.write("Application Name,CPU,Heap,GC");
+            bw.newLine();
+
+            // Write data for each application
+            for (String app : applications) {
+                StringBuilder line = new StringBuilder();
+                line.append(app).append(",");
+                line.append(cpuData.getOrDefault(app, "")).append(",");
+                line.append(heapData.getOrDefault(app, "")).append(",");
+                line.append(gcData.getOrDefault(app, ""));
+                
+                bw.write(line.toString());
+                bw.newLine();
+            }
+        }
+    }
+}
