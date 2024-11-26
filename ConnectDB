@@ -1,0 +1,114 @@
+import java.io.FileWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.PreparedStatement;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Date;
+
+public class OracleToCSV {
+    // Database connection details
+    private static final String DB_URL = "jdbc:oracle:thin:@hostname:port:database";
+    private static final String USERNAME = "your_username";
+    private static final String PASSWORD = "your_password";
+    
+    // Output CSV file path
+    private static final String CSV_FILE_PATH = "attendance_report.csv";
+    
+    public static void main(String[] args) {
+        if (args.length != 2) {
+            System.out.println("Usage: java OracleToCSV <start_date> <end_date>");
+            System.out.println("Date format: dd/MM/yyyy HH:mm");
+            System.out.println("Example: java OracleToCSV \"19/10/2024 08:00\" \"25/10/2024 23:00\"");
+            return;
+        }
+
+        String startDate = args[0];
+        String endDate = args[1];
+        
+        // SQL query with placeholders
+        String SQL_QUERY = "SELECT ATTENDANCE FROM SCHOOL FROM DATE ? TO ?";
+        
+        try {
+            // Validate date format
+            SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+            Date parsedStartDate = dateFormat.parse(startDate);
+            Date parsedEndDate = dateFormat.parse(endDate);
+            
+            // Load Oracle JDBC Driver
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            
+            // Create connection
+            System.out.println("Connecting to database...");
+            Connection conn = DriverManager.getConnection(DB_URL, USERNAME, PASSWORD);
+            
+            // Create prepared statement
+            PreparedStatement pstmt = conn.prepareStatement(SQL_QUERY);
+            pstmt.setString(1, startDate);
+            pstmt.setString(2, endDate);
+            
+            // Execute query
+            System.out.println("Executing query for date range: " + startDate + " to " + endDate);
+            ResultSet rs = pstmt.executeQuery();
+            
+            // Get metadata
+            ResultSetMetaData rsmd = rs.getMetaData();
+            int columnCount = rsmd.getColumnCount();
+            
+            // Create FileWriter for CSV
+            FileWriter csvWriter = new FileWriter(CSV_FILE_PATH);
+            
+            // Write header row
+            List<String> columnNames = new ArrayList<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columnNames.add(rsmd.getColumnName(i));
+            }
+            csvWriter.append(String.join(",", columnNames));
+            csvWriter.append("\n");
+            
+            // Write data rows
+            int rowCount = 0;
+            while (rs.next()) {
+                List<String> rowData = new ArrayList<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String value = rs.getString(i);
+                    // Handle null values and escape commas
+                    if (value == null) {
+                        value = "";
+                    } else if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+                        value = "\"" + value.replace("\"", "\"\"") + "\"";
+                    }
+                    rowData.add(value);
+                }
+                csvWriter.append(String.join(",", rowData));
+                csvWriter.append("\n");
+                rowCount++;
+                
+                // Print progress for every 1000 rows
+                if (rowCount % 1000 == 0) {
+                    System.out.println("Processed " + rowCount + " rows...");
+                }
+            }
+            
+            // Close resources
+            csvWriter.flush();
+            csvWriter.close();
+            rs.close();
+            pstmt.close();
+            conn.close();
+            
+            System.out.println("Export completed. Total rows: " + rowCount);
+            System.out.println("Data has been exported to " + CSV_FILE_PATH);
+            
+        } catch (java.text.ParseException e) {
+            System.err.println("Invalid date format. Please use dd/MM/yyyy HH:mm");
+            System.err.println("Error: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
